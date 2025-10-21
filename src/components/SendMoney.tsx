@@ -1,42 +1,85 @@
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ArrowLeft, Send, User } from "lucide-react";
-import { useState } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+"use client"
 
-interface SendMoneyProps {
-  onBack: () => void;
-  onSend: (recipient: string, amount: number, note: string) => void;
-}
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { ArrowLeft, Send, User } from "lucide-react"
+import { useState } from "react"
+import { transferApi } from "@/lib/api"
+import { toast } from "sonner"
+import { v4 as uuidv4 } from "uuid"
+import { SupportedCurrencies } from "@/types/wallet"
+import { motion, AnimatePresence } from "framer-motion"
+import { CheckCircle2 } from "lucide-react"
 
-export const SendMoney = ({ onBack, onSend }: SendMoneyProps) => {
-  const [recipient, setRecipient] = useState("");
-  const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
-  const [step, setStep] = useState<"recipient" | "amount" | "confirm">("recipient");
+
+export const SendMoney = ({ onBack }: { onBack: () => void }) => {
+  const [recipient, setRecipient] = useState("")
+  const [amount, setAmount] = useState("")
+  const [note, setNote] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [step, setStep] = useState<"recipient" | "amount" | "confirm">("recipient")
+
+  const quickAmounts = [1000, 5000, 10000, 20000]
 
   const handleNext = () => {
     if (step === "recipient" && recipient) {
-      setStep("amount");
+      setStep("amount")
     } else if (step === "amount" && amount) {
-      setStep("confirm");
+      setStep("confirm")
     }
-  };
+  }
 
-  const handleSend = () => {
-    onSend(recipient, parseFloat(amount), note);
-  };
+  const [showSuccess, setShowSuccess] = useState(false)
+  const [lastTransfer, setLastTransfer] = useState<{ amount: number; recipient: string } | null>(null)
 
-  const quickAmounts = [10, 25, 50, 100];
+  const handleSend = async () => {
+    setLoading(true)
+    try {
+      const payload = {
+        destinationUsername: recipient.startsWith("@")
+          ? recipient.substring(1)
+          : recipient,
+        amount: parseFloat(amount),
+        currency: SupportedCurrencies.NGN,
+        idempotencyKey: uuidv4(),
+      }
+
+      const response = await transferApi.transferFunds(payload)
+
+      // ✅ Save details before resetting
+      setLastTransfer({
+        amount: parseFloat(amount),
+        recipient: recipient.startsWith("@") ? recipient : `@${recipient}`,
+      })
+
+      // ✅ Show success popup
+      setShowSuccess(true)
+
+      console.log("Transfer Response:", response)
+
+      // ✅ Reset input fields AFTER popup shows
+      setRecipient("")
+      setAmount("")
+      setNote("")
+      setStep("recipient")
+    } catch (error: any) {
+      console.error(error)
+      toast.error(error.response?.data?.message || "Transfer failed")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <div className="flex items-center p-4 border-b border-border">
-        <Button 
+        <Button
           onClick={step === "recipient" ? onBack : () => setStep(step === "confirm" ? "amount" : "recipient")}
-          variant="ghost" 
+          variant="ghost"
           size="icon"
           className="rounded-full"
         >
@@ -53,17 +96,17 @@ export const SendMoney = ({ onBack, onSend }: SendMoneyProps) => {
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                   <User className="h-8 w-8 text-primary" />
                 </div>
-                <h2 className="text-2xl font-bold text-foreground mb-2">Who are you sending to?</h2>
-                <p className="text-muted-foreground">Enter their username or email</p>
+                <h2 className="text-2xl font-bold mb-2">Who are you sending to?</h2>
+                <p className="text-muted-foreground">Enter their username (with or without @)</p>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="recipient">Username or Email</Label>
+                  <Label htmlFor="recipient">Username</Label>
                   <Input
                     id="recipient"
                     type="text"
-                    placeholder="@username or email@example.com"
+                    placeholder="@username"
                     value={recipient}
                     onChange={(e) => setRecipient(e.target.value)}
                     className="h-12 text-center text-lg"
@@ -71,10 +114,10 @@ export const SendMoney = ({ onBack, onSend }: SendMoneyProps) => {
                   />
                 </div>
 
-                <Button 
+                <Button
                   onClick={handleNext}
                   disabled={!recipient}
-                  variant="default" 
+                  variant="default"
                   size="lg"
                   className="w-full"
                 >
@@ -82,27 +125,6 @@ export const SendMoney = ({ onBack, onSend }: SendMoneyProps) => {
                 </Button>
               </div>
             </Card>
-
-            {/* Recent Recipients */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Recent</h3>
-              <div className="space-y-2">
-                {["@sarah_m", "@mike.johnson", "@alexk"].map((user) => (
-                  <Card 
-                    key={user}
-                    className="p-4 cursor-pointer hover:shadow-elevated transition-all duration-300"
-                    onClick={() => setRecipient(user)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                        <User className="h-5 w-5 text-primary" />
-                      </div>
-                      <span className="font-medium">{user}</span>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </div>
           </div>
         )}
 
@@ -110,23 +132,23 @@ export const SendMoney = ({ onBack, onSend }: SendMoneyProps) => {
           <div className="space-y-6">
             <Card className="p-6 shadow-elevated">
               <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold text-foreground mb-2">How much?</h2>
+                <h2 className="text-2xl font-bold mb-2">How much?</h2>
                 <p className="text-muted-foreground">Sending to {recipient}</p>
               </div>
 
               <div className="space-y-6">
                 <div className="text-center">
-                  <div className="text-5xl font-bold text-foreground mb-4">
-                    ${amount || "0.00"}
+                  <div className="text-5xl font-bold mb-4">
+                    ₦{amount || "0"}
                   </div>
                   <Input
                     type="number"
-                    placeholder="0.00"
+                    placeholder="Enter amount"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     className="h-16 text-center text-2xl border-2"
-                    step="0.01"
-                    min="0.01"
+                    step="100"
+                    min="100"
                     autoFocus
                   />
                 </div>
@@ -139,7 +161,7 @@ export const SendMoney = ({ onBack, onSend }: SendMoneyProps) => {
                       variant="outline"
                       className="h-12"
                     >
-                      ${quickAmount}
+                      ₦{quickAmount.toLocaleString()}
                     </Button>
                   ))}
                 </div>
@@ -156,10 +178,10 @@ export const SendMoney = ({ onBack, onSend }: SendMoneyProps) => {
                   />
                 </div>
 
-                <Button 
+                <Button
                   onClick={handleNext}
                   disabled={!amount || parseFloat(amount) <= 0}
-                  variant="default" 
+                  variant="default"
                   size="lg"
                   className="w-full"
                 >
@@ -174,50 +196,89 @@ export const SendMoney = ({ onBack, onSend }: SendMoneyProps) => {
           <div className="space-y-6">
             <Card className="p-6 shadow-elevated">
               <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold text-foreground mb-2">Confirm Payment</h2>
-                <p className="text-muted-foreground">Review your payment details</p>
+                <h2 className="text-2xl font-bold mb-2">Confirm Transfer</h2>
+                <p className="text-muted-foreground">Review your details before sending</p>
               </div>
 
               <div className="space-y-6">
                 <div className="text-center p-6 bg-accent-light rounded-lg">
-                  <div className="text-4xl font-bold text-accent mb-2">
-                    ${parseFloat(amount).toFixed(2)}
+                  <div className="text-4xl font-bold mb-2">
+                    ₦{parseFloat(amount).toLocaleString()}
                   </div>
-                  <p className="text-accent font-medium">to {recipient}</p>
+                  <p className="font-medium">to {recipient}</p>
                   {note && <p className="text-sm text-muted-foreground mt-2">"{note}"</p>}
                 </div>
 
                 <div className="space-y-3 p-4 bg-muted rounded-lg">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Amount</span>
-                    <span className="font-medium">${parseFloat(amount).toFixed(2)}</span>
+                    <span className="font-medium">₦{parseFloat(amount).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Fee</span>
-                    <span className="font-medium">$0.00</span>
+                    <span className="font-medium">₦0</span>
                   </div>
                   <div className="border-t border-border pt-2">
                     <div className="flex justify-between">
                       <span className="font-semibold">Total</span>
-                      <span className="font-semibold">${parseFloat(amount).toFixed(2)}</span>
+                      <span className="font-semibold">₦{parseFloat(amount).toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
 
-                <Button 
+                <Button
                   onClick={handleSend}
-                  variant="success" 
+                  variant="success"
                   size="lg"
                   className="w-full"
+                  disabled={loading}
                 >
                   <Send className="h-5 w-5 mr-2" />
-                  Send Money
+                  {loading ? "Sending..." : "Send Money"}
                 </Button>
               </div>
             </Card>
           </div>
         )}
       </div>
+      <AnimatePresence>
+        {showSuccess && lastTransfer && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              className="bg-white dark:bg-neutral-900 rounded-2xl p-8 text-center shadow-2xl max-w-sm mx-auto"
+            >
+              <CheckCircle2 className="text-green-500 w-16 h-16 mx-auto mb-4" />
+              <h2 className="text-2xl font-semibold mb-2">Transfer Successful 🎉</h2>
+              <p className="text-muted-foreground mb-4">
+                You’ve sent{" "}
+                <span className="font-semibold text-green-600">
+                  ₦{lastTransfer.amount.toLocaleString()}
+                </span>{" "}
+                to{" "}
+                <span className="font-semibold">{lastTransfer.recipient}</span>
+              </p>
+              <Button
+                variant="default"
+                className="w-full"
+                onClick={() => setShowSuccess(false)}
+              >
+                Done
+              </Button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+
     </div>
-  );
-};
+    
+  )
+}

@@ -1,13 +1,18 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import { WelcomeScreen } from "./WelcomeScreen";
 import { AuthScreen } from "./AuthScreen";
 import { Dashboard } from "./Dashboard";
 import { SendMoney } from "./SendMoney";
+import { WithdrawFunds } from "./WithdrawFund"; 
 import { FundWallet } from "./FundWallet";
 import { UserProfile } from "./UserProfile";
 import { useToast } from "@/hooks/use-toast";
+import { walletApi } from "@/lib/api";
+import { SupportedCurrencies } from "@/types/wallet";
 
-type Screen = "welcome" | "auth" | "dashboard" | "send-money" | "fund-wallet" | "profile";
+
+type Screen = "welcome" | "auth" | "dashboard" | "send-money" | "fund-wallet" | "withdraw" | "profile";
 
 export const PaymentApp = () => {
   const [currentScreen, setCurrentScreen] = useState<Screen>("welcome");
@@ -74,6 +79,30 @@ export const PaymentApp = () => {
     return <FundWallet onBack={() => setCurrentScreen("dashboard")} onFund={handleFundWallet} />;
   }
 
+  if (currentScreen === "withdraw") {
+    return (
+      <WithdrawFunds
+        onBack={() => setCurrentScreen("dashboard")}
+        onWithdraw={async (amount, bankAccountNumber, bankCode) => {
+          try {
+            await walletApi.initiateCashout({
+              dto: { amount, bankAccountNumber, bankCode, currency: SupportedCurrencies.NGN },
+            })
+
+            toast.success("Withdrawal successful")
+
+            setCurrentScreen("dashboard")
+          } catch (err: any) {
+            toast.error(err?.message || "Failed to withdraw funds")
+
+          }
+        }}
+      />
+    )
+  }
+
+
+
   if (currentScreen === "profile") {
     return (
       <UserProfile 
@@ -90,6 +119,7 @@ export const PaymentApp = () => {
       user={user}
       onSendMoney={() => setCurrentScreen("send-money")}
       onFundWallet={() => setCurrentScreen("fund-wallet")}
+      onWithdraw={() => setCurrentScreen("withdraw")}
       onProfile={() => setCurrentScreen("profile")}
     />
   );

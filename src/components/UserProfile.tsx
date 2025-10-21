@@ -1,50 +1,126 @@
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, Camera, Edit3, LogOut, Shield, Bell } from "lucide-react";
-import { useState } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+"use client"
+
+import { useEffect, useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { ArrowLeft, Camera, Edit3, LogOut, Shield, Bell } from "lucide-react"
+import { userApi } from "@/lib/api"
+import { toast } from "sonner"
 
 interface UserProfileProps {
-  user: { name: string; email: string };
-  onBack: () => void;
-  onUpdateProfile: (userData: { name: string; email: string; username: string }) => void;
-  onSignOut: () => void;
+  onBack: () => void
+  onSignOut: () => void
 }
 
-export const UserProfile = ({ user, onBack, onUpdateProfile, onSignOut }: UserProfileProps) => {
-  const [isEditing, setIsEditing] = useState(false);
+export const UserProfile = ({ onBack, onSignOut }: UserProfileProps) => {
+  const [isEditing, setIsEditing] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<any>(null)
   const [formData, setFormData] = useState({
-    name: user.name,
-    email: user.email,
-    username: "@johndoe",
-    phone: "+1 (555) 123-4567"
-  });
+    firstName: "",
+    lastName: "",
+    email: "",
+    username: "",
+    phone: "",
+  })
+  const [usernameStatus, setUsernameStatus] = useState<"available" | "taken" | "checking" | null>(null)
+  const [usernameMessage, setUsernameMessage] = useState("")
 
-  const handleSave = () => {
-    onUpdateProfile({
-      name: formData.name,
-      email: formData.email,
-      username: formData.username
-    });
-    setIsEditing(false);
-  };
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const profile = await userApi.getProfile()
+        setUser(profile)
+        setFormData({
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          email: profile.email,
+          username: profile.username,
+          phone: profile.phone || "",
+        })
+      } catch (err) {
+        console.error(err)
+        toast.error("Failed to load profile")
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadProfile()
+  }, [])
+
+  const handleSave = async () => {
+    try {
+      if (!user?.id) return toast.error("User ID not found")
+
+      await userApi.updateUsername(user.id, formData.username)
+      toast.success("Profile updated successfully")
+
+      setUser((prev: any) => ({
+        ...prev,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        username: formData.username,
+        phone: formData.phone,
+      }))
+      setIsEditing(false)
+    } catch (err: any) {
+      console.error(err)
+      toast.error(err?.response?.data?.message || "Failed to update profile")
+    }
+  }
 
   const menuItems = [
-    { icon: Shield, label: "Security", description: "Password, 2FA, Login history" },
-    { icon: Bell, label: "Notifications", description: "Push notifications, Email alerts" },
-    { icon: LogOut, label: "Sign Out", description: "Sign out of your account", action: onSignOut, danger: true },
-  ];
+    {
+      icon: Shield,
+      label: "Security",
+      description: "Password, 2FA, Login history",
+    },
+    {
+      icon: Bell,
+      label: "Notifications",
+      description: "Push notifications, Email alerts",
+    },
+    {
+      icon: LogOut,
+      label: "Sign Out",
+      description: "Sign out of your account",
+      action: onSignOut,
+      danger: true,
+    },
+  ]
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen text-muted-foreground">
+        Loading profile...
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen text-destructive">
+        Could not load profile data.
+      </div>
+    )
+  }
+
+  const fullName = `${formData.firstName} ${formData.lastName}`
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border">
         <div className="flex items-center">
-          <Button 
+          <Button
             onClick={onBack}
-            variant="ghost" 
+            variant="ghost"
             size="icon"
             className="rounded-full"
           >
@@ -52,9 +128,9 @@ export const UserProfile = ({ user, onBack, onUpdateProfile, onSignOut }: UserPr
           </Button>
           <h1 className="ml-4 text-xl font-semibold">Profile</h1>
         </div>
-        <Button 
+        <Button
           onClick={() => setIsEditing(!isEditing)}
-          variant="ghost" 
+          variant="ghost"
           size="icon"
           className="rounded-full"
         >
@@ -62,6 +138,7 @@ export const UserProfile = ({ user, onBack, onUpdateProfile, onSignOut }: UserPr
         </Button>
       </div>
 
+      {/* Main */}
       <div className="flex-1 p-6 space-y-6">
         {/* Profile Card */}
         <Card className="p-6 shadow-elevated">
@@ -69,12 +146,13 @@ export const UserProfile = ({ user, onBack, onUpdateProfile, onSignOut }: UserPr
             <div className="relative inline-block">
               <Avatar className="h-24 w-24 mb-4">
                 <AvatarFallback className="bg-gradient-primary text-primary-foreground text-2xl">
-                  {user.name.split(' ').map(n => n[0]).join('')}
+                  {formData.firstName[0]}
+                  {formData.lastName[0]}
                 </AvatarFallback>
               </Avatar>
               {isEditing && (
-                <Button 
-                  size="icon" 
+                <Button
+                  size="icon"
                   variant="outline"
                   className="absolute -bottom-2 -right-2 rounded-full h-8 w-8"
                 >
@@ -84,8 +162,10 @@ export const UserProfile = ({ user, onBack, onUpdateProfile, onSignOut }: UserPr
             </div>
             {!isEditing && (
               <div>
-                <h2 className="text-2xl font-bold text-foreground mb-1">{user.name}</h2>
-                <p className="text-muted-foreground">{formData.username}</p>
+                <h2 className="text-2xl font-bold text-foreground mb-1">
+                  {fullName}
+                </h2>
+                <p className="text-muted-foreground">@{formData.username}</p>
               </div>
             )}
           </div>
@@ -97,11 +177,13 @@ export const UserProfile = ({ user, onBack, onUpdateProfile, onSignOut }: UserPr
                   <Label htmlFor="firstName">First Name</Label>
                   <Input
                     id="firstName"
-                    value={formData.name.split(' ')[0]}
-                    onChange={(e) => setFormData(prev => ({
-                      ...prev,
-                      name: `${e.target.value} ${prev.name.split(' ')[1] || ''}`
-                    }))}
+                    value={formData.firstName}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        firstName: e.target.value,
+                      }))
+                    }
                     className="h-12"
                   />
                 </div>
@@ -109,11 +191,13 @@ export const UserProfile = ({ user, onBack, onUpdateProfile, onSignOut }: UserPr
                   <Label htmlFor="lastName">Last Name</Label>
                   <Input
                     id="lastName"
-                    value={formData.name.split(' ')[1] || ''}
-                    onChange={(e) => setFormData(prev => ({
-                      ...prev,
-                      name: `${prev.name.split(' ')[0]} ${e.target.value}`
-                    }))}
+                    value={formData.lastName}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        lastName: e.target.value,
+                      }))
+                    }
                     className="h-12"
                   />
                 </div>
@@ -124,10 +208,51 @@ export const UserProfile = ({ user, onBack, onUpdateProfile, onSignOut }: UserPr
                 <Input
                   id="username"
                   value={formData.username}
-                  onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+                  onChange={async (e) => {
+                    const newUsername = e.target.value
+                    setFormData((prev) => ({ ...prev, username: newUsername }))
+
+                    if (!newUsername.trim()) {
+                      setUsernameStatus(null)
+                      setUsernameMessage("")
+                      return
+                    }
+
+                    setUsernameStatus("checking")
+                    setUsernameMessage("Checking availability...")
+
+                    try {
+                      const result = await userApi.checkUsernameAvailability(newUsername)
+                      if (result.available) {
+                        setUsernameStatus("available")
+                        setUsernameMessage("Username is available ")
+                      } else {
+                        setUsernameStatus("taken")
+                        setUsernameMessage("Username is already taken ")
+                      }
+                    } catch (err) {
+                      console.error(err)
+                      setUsernameStatus(null)
+                      setUsernameMessage("Could not check availability")
+                    }
+                  }}
                   className="h-12"
                 />
+
+                {usernameMessage && (
+                  <p
+                    className={`text-sm mt-1 ${usernameStatus === "available"
+                        ? "text-green-600"
+                        : usernameStatus === "taken"
+                          ? "text-red-600"
+                          : "text-muted-foreground"
+                      }`}
+                  >
+                    {usernameMessage}
+                  </p>
+                )}
               </div>
+
 
               <div>
                 <Label htmlFor="email">Email</Label>
@@ -135,7 +260,7 @@ export const UserProfile = ({ user, onBack, onUpdateProfile, onSignOut }: UserPr
                   id="email"
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  disabled
                   className="h-12"
                 />
               </div>
@@ -146,22 +271,27 @@ export const UserProfile = ({ user, onBack, onUpdateProfile, onSignOut }: UserPr
                   id="phone"
                   type="tel"
                   value={formData.phone}
-                  onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      phone: e.target.value,
+                    }))
+                  }
                   className="h-12"
                 />
               </div>
 
               <div className="flex gap-3 pt-4">
-                <Button 
+                <Button
                   onClick={() => setIsEditing(false)}
-                  variant="outline" 
+                  variant="outline"
                   className="flex-1"
                 >
                   Cancel
                 </Button>
-                <Button 
+                <Button
                   onClick={handleSave}
-                  variant="default" 
+                  variant="default"
                   className="flex-1"
                 >
                   Save Changes
@@ -176,11 +306,15 @@ export const UserProfile = ({ user, onBack, onUpdateProfile, onSignOut }: UserPr
               </div>
               <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
                 <span className="text-muted-foreground">Phone</span>
-                <span className="font-medium">{formData.phone}</span>
+                <span className="font-medium">
+                  {formData.phone || "Not set"}
+                </span>
               </div>
               <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
                 <span className="text-muted-foreground">Member Since</span>
-                <span className="font-medium">December 2024</span>
+                <span className="font-medium">
+                  {new Date(user.createdAt).toLocaleDateString()}
+                </span>
               </div>
             </div>
           )}
@@ -190,24 +324,31 @@ export const UserProfile = ({ user, onBack, onUpdateProfile, onSignOut }: UserPr
         {!isEditing && (
           <div className="space-y-3">
             {menuItems.map((item, index) => (
-              <Card 
+              <Card
                 key={index}
                 className="p-4 cursor-pointer hover:shadow-elevated transition-all duration-300"
                 onClick={item.action}
               >
                 <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    item.danger ? 'bg-destructive/10' : 'bg-primary/10'
-                  }`}>
-                    <item.icon className={`h-5 w-5 ${
-                      item.danger ? 'text-destructive' : 'text-primary'
-                    }`} />
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center ${item.danger ? "bg-destructive/10" : "bg-primary/10"
+                      }`}
+                  >
+                    <item.icon
+                      className={`h-5 w-5 ${item.danger ? "text-destructive" : "text-primary"
+                        }`}
+                    />
                   </div>
                   <div className="flex-1">
-                    <p className={`font-medium ${item.danger ? 'text-destructive' : 'text-foreground'}`}>
+                    <p
+                      className={`font-medium ${item.danger ? "text-destructive" : "text-foreground"
+                        }`}
+                    >
                       {item.label}
                     </p>
-                    <p className="text-sm text-muted-foreground">{item.description}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {item.description}
+                    </p>
                   </div>
                 </div>
               </Card>
@@ -215,13 +356,13 @@ export const UserProfile = ({ user, onBack, onUpdateProfile, onSignOut }: UserPr
           </div>
         )}
 
-        {/* App Version */}
+        {/* App Footer */}
         {!isEditing && (
           <div className="text-center pt-6">
-            <p className="text-sm text-muted-foreground">PayFlow v1.0.0</p>
+            <p className="text-sm text-muted-foreground">PayBudz</p>
           </div>
         )}
       </div>
     </div>
-  );
-};
+  )
+}

@@ -1,63 +1,78 @@
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ArrowLeft, CreditCard, Plus } from "lucide-react";
-import { useState } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+"use client"
+
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { ArrowLeft, Plus, CreditCard } from "lucide-react"
+import { toast } from "sonner"
+import { walletApi } from "@/lib/api" 
 
 interface FundWalletProps {
-  onBack: () => void;
-  onFund: (amount: number, method: string) => void;
+  onBack: () => void
 }
 
-export const FundWallet = ({ onBack, onFund }: FundWalletProps) => {
-  const [amount, setAmount] = useState("");
-  const [selectedMethod, setSelectedMethod] = useState("card");
+export const FundWallet = ({ onBack }: FundWalletProps) => {
+  const [amount, setAmount] = useState("")
+  const [loading, setLoading] = useState(false)
+  const quickAmounts = [1000, 5000, 10000, 20000]
 
-  const quickAmounts = [25, 50, 100, 200];
+  const handleTopUp = async () => {
+    try {
+      if (!amount || parseFloat(amount) <= 0) {
+        toast.error("Please enter a valid amount")
+        return
+      }
 
-  const paymentMethods = [
-    { id: "card", name: "Credit/Debit Card", icon: "💳", description: "Instant funding" },
-    { id: "bank", name: "Bank Account", icon: "🏦", description: "1-3 business days" },
-    { id: "apple", name: "Apple Pay", icon: "📱", description: "Instant funding" },
-  ];
+      setLoading(true)
+      const response = await walletApi.initiateTopUp(parseFloat(amount), "NGN")
 
-  const handleFund = () => {
-    if (amount && parseFloat(amount) > 0) {
-      onFund(parseFloat(amount), selectedMethod);
+      if (response?.paymentLink) {
+        toast.success("Redirecting to payment page...")
+        window.location.href = response.paymentLink
+      } else {
+        toast.error("Unable to get payment link")
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to initiate top-up")
+    } finally {
+      setLoading(false)
     }
-  };
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <div className="flex items-center p-4 border-b border-border">
-        <Button 
+        <Button
           onClick={onBack}
-          variant="ghost" 
+          variant="ghost"
           size="icon"
           className="rounded-full"
         >
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <h1 className="ml-4 text-xl font-semibold">Add Money</h1>
+        <h1 className="ml-4 text-xl font-semibold">Fund Wallet</h1>
       </div>
 
       <div className="flex-1 p-6 space-y-6">
-        {/* Amount Section */}
-        <Card className="p-6 shadow-elevated">
+        <Card className="p-6 shadow-md">
           <div className="text-center mb-6">
-            <div className="w-16 h-16 bg-accent-light rounded-full flex items-center justify-center mx-auto mb-4">
-              <Plus className="h-8 w-8 text-accent" />
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Plus className="h-8 w-8 text-primary" />
             </div>
-            <h2 className="text-2xl font-bold text-foreground mb-2">How much to add?</h2>
-            <p className="text-muted-foreground">Choose an amount to fund your wallet</p>
+            <h2 className="text-2xl font-bold mb-2">Enter Amount</h2>
+            <p className="text-muted-foreground">
+              Choose or enter the amount you want to fund
+            </p>
           </div>
 
           <div className="space-y-6">
             <div className="text-center">
-              <div className="text-5xl font-bold text-foreground mb-4">
-                ${amount || "0.00"}
+              <div className="text-5xl font-bold mb-4">
+                ₦{amount ? parseFloat(amount).toLocaleString() : "0.00"}
               </div>
               <Input
                 type="number"
@@ -79,101 +94,29 @@ export const FundWallet = ({ onBack, onFund }: FundWalletProps) => {
                   variant="outline"
                   className="h-12"
                 >
-                  ${quickAmount}
+                  ₦{quickAmount.toLocaleString()}
                 </Button>
               ))}
             </div>
+
+            <Button
+              onClick={handleTopUp}
+              disabled={!amount || parseFloat(amount) <= 0 || loading}
+              size="lg"
+              className="w-full"
+            >
+              <CreditCard className="h-5 w-5 mr-2" />
+              {loading ? "Processing..." : `Fund ₦${amount || "0.00"}`}
+            </Button>
           </div>
         </Card>
 
-        {/* Payment Method Selection */}
-        <Card className="p-6 shadow-elevated">
-          <h3 className="text-lg font-semibold mb-4">Payment Method</h3>
-          <div className="space-y-3">
-            {paymentMethods.map((method) => (
-              <div
-                key={method.id}
-                onClick={() => setSelectedMethod(method.id)}
-                className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-300 ${
-                  selectedMethod === method.id
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/50'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{method.icon}</span>
-                  <div className="flex-1">
-                    <p className="font-medium text-foreground">{method.name}</p>
-                    <p className="text-sm text-muted-foreground">{method.description}</p>
-                  </div>
-                  {selectedMethod === method.id && (
-                    <div className="w-5 h-5 bg-primary rounded-full flex items-center justify-center">
-                      <div className="w-2 h-2 bg-primary-foreground rounded-full"></div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* Card Details (if card selected) */}
-        {selectedMethod === "card" && (
-          <Card className="p-6 shadow-elevated">
-            <h3 className="text-lg font-semibold mb-4">Card Details</h3>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="cardNumber">Card Number</Label>
-                <Input
-                  id="cardNumber"
-                  type="text"
-                  placeholder="1234 5678 9012 3456"
-                  className="h-12"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="expiry">Expiry</Label>
-                  <Input
-                    id="expiry"
-                    type="text"
-                    placeholder="MM/YY"
-                    className="h-12"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="cvv">CVV</Label>
-                  <Input
-                    id="cvv"
-                    type="text"
-                    placeholder="123"
-                    className="h-12"
-                  />
-                </div>
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {/* Add Money Button */}
-        <Button 
-          onClick={handleFund}
-          disabled={!amount || parseFloat(amount) <= 0}
-          variant="success" 
-          size="lg"
-          className="w-full"
-        >
-          <CreditCard className="h-5 w-5 mr-2" />
-          Add ${amount || "0.00"} to Wallet
-        </Button>
-
-        {/* Security Note */}
         <div className="text-center p-4 bg-muted rounded-lg">
           <p className="text-sm text-muted-foreground">
-            🔒 Your payment information is encrypted and secure. We never store your card details.
+            🔒 You’ll be redirected to a secure Paystack page to complete your payment.
           </p>
         </div>
       </div>
     </div>
-  );
-};
+  )
+}

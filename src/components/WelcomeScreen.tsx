@@ -24,7 +24,7 @@ export const WelcomeScreen = ({ onGetStarted }: WelcomeScreenProps) => {
           <div className="text-center space-y-6">
             <div>
               <h1 className="text-3xl font-bold text-foreground mb-2">
-                Welcome to PayFlow
+                Welcome to PayBudz
               </h1>
               <p className="text-muted-foreground text-lg">
                 Send money instantly to friends and family with just their username
