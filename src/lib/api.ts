@@ -3,7 +3,7 @@ import { getAuth } from "firebase/auth";
 import axios, { type AxiosError } from "axios"
 
 const API_BASE_URL = "http://localhost:3001" 
-// const API_BASE_URL = "https://paybudz-api-staging.kochtech.xyz/"
+// const API_BASE_URL = "https://paybudz-api-staging.kochtech.xyz"
 
 export const api = axios.create({
     baseURL: API_BASE_URL,
